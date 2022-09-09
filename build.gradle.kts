@@ -29,7 +29,7 @@ publishing {
             pom {
                 name.set("Dependency conflict analyzer")
                 description.set("Help find conflict in gradle")
-                url.set("http://www.example.com/library")
+                url.set("https://github.com/Solneo/dependency-conflict-analyzer")
 
                 licenses {
                     license {
@@ -41,13 +41,13 @@ publishing {
                     developer {
                         id.set("dchernyaev")
                         name.set("Daniil Chernyaev")
-                        email.set("john.doe@example.com")
+                        email.set("chdanilr@gmail.com")
                     }
                 }
                 scm {
-                    connection.set("scm:git:git://example.com/my-library.git")
-                    developerConnection.set("scm:git:ssh://example.com/my-library.git")
-                    url.set("http://example.com/my-library/")
+                    connection.set("https://github.com/Solneo/dependency-conflict-analyzer.git")
+                    developerConnection.set("git@github.com:Solneo/dependency-conflict-analyzer.git")
+                    url.set("https://github.com/Solneo/dependency-conflict-analyzer")
                 }
             }
         }
