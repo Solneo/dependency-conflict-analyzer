@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
+    id("com.gradle.plugin-publish") version "1.0.0"
     kotlin("jvm") version "1.5.31"
     `java-gradle-plugin`
     `kotlin-dsl`
@@ -11,18 +12,26 @@ plugins {
 gradlePlugin {
     plugins {
         create("dependencyConflictAnalyzer") {
-            id = "com.dchernyaev.dependency-conflict-analyzer"
+            id = "io.github.solneo.dependency-conflict-analyzer"
+            displayName = "Dependency Conflict Analyzer"
+            description = "Help find conflict in gradle"
             implementationClass = "DependencyConflictAnalyzer"
         }
     }
 }
 
+pluginBundle {
+    website = "https://github.com/Solneo/dependency-conflict-analyzer"
+    vcsUrl = "https://github.com/Solneo/dependency-conflict-analyzer"
+    tags = listOf("dependency", "conflict", "analyzer", "plugins")
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            groupId = "com.dchernyaev.dca"
+            groupId = "io.github.solneo"
             artifactId = "dependency-conflict-analyzer"
-            version = "1.0.0-SNAPSHOT"
+            version = "${project.version}"
 
             from(components["java"])
 
@@ -55,9 +64,15 @@ publishing {
 
     repositories {
         maven {
-            val releasesRepoUrl = layout.buildDirectory.dir("repos/releases")
-            val snapshotsRepoUrl = layout.buildDirectory.dir("repos/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+            url = if ("${project.version}".contains("SNAPSHOT")) {
+                uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            } else {
+                uri("https://s01.oss.sonatype.org/content/repositories/releases/")
+            }
+            credentials {
+                username = project.properties["mavenCentralUsername"].toString()
+                password = project.properties["mavenCentralPassword"].toString()
+            }
         }
     }
 }
@@ -71,8 +86,7 @@ signing {
     sign(publishing.publications["maven"])
 }
 
-group = "com.dchernyaev.dca"
-version = "1.0.0-SNAPSHOT"
+group = "io.github.solneo"
 
 repositories {
     mavenCentral()
@@ -80,7 +94,6 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
-    implementation(gradleApi())
 }
 
 tasks.test {

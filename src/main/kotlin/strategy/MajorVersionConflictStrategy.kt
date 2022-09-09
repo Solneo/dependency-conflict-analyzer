@@ -34,7 +34,7 @@ class MajorVersionConflictStrategy : ConflictStrategy {
                     DependencyNode(module[2], depResult.from.toString())
             }
         } catch (e: Exception) {
-            logger.error("Unexpectable version convention. Fail with: ", e)
+            //don't show unexpected version convention
         }
         return AnalyzedConflict()
     }

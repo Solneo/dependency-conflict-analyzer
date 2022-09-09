@@ -11,14 +11,14 @@ artifact with the highest version.
 In your app's build.gradle:
 
 ```
-apply plugin: 'com.dchernyaev.dependency-conflict-analyzer'
+apply plugin: 'io.github.solneo.dependency-conflict-analyzer'
 ```
 
 In order to use this plugin, you will also need to add the following to your
 buildscript classpath:
 
 ```
-classpath 'com.dchernyaev.dca:dependency-conflict-analyzer:1.0.0'
+classpath 'com.dchernyaev.dca:dependency-conflict-analyzer:1.0.2'
 ```
 
 ## Configuration
@@ -40,5 +40,3 @@ dependencyConflictAnalyzer {
    ...
 }
 ```
-
-Currently added not yet published in mavenCentral()
