@@ -6,6 +6,10 @@ relies on major versions of artifacts. This may happen when
 Uses the default Gradle dependency resolution strategy because it uses
 artifact with the highest version.
 
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/solneo/dependency-conflict-analyzer/CI)
+![GitHub](https://img.shields.io/github/license/solneo/dependency-conflict-analyzer)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/solneo/dependency-conflict-analyzer)
+
 ## Usage in Groovy
 
 On your `build.gradle` add:
