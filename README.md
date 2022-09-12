@@ -8,9 +8,21 @@ artifact with the highest version.
 
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/solneo/dependency-conflict-analyzer/CI)
 ![GitHub](https://img.shields.io/github/license/solneo/dependency-conflict-analyzer)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/solneo/dependency-conflict-analyzer)
+![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.solneo.dependency-conflict-analyzer)
 
 ## Usage in Groovy
+
+### Using the plugins DSL
+
+On your `build.gradle` add:
+
+```groovy
+plugins {
+  id "io.github.solneo.dependency-conflict-analyzer" version "1.0.2"
+}
+```
+
+### Using legacy plugin application
 
 On your `build.gradle` add:
 
@@ -27,13 +39,22 @@ classpath 'com.dchernyaev.dca:dependency-conflict-analyzer:1.0.2'
 
 ## Usage in KTS
 
+### Using the plugins DSL
+
 On your `build.gradle.kts` add:
 
 ```kotlin
 plugins {
-    ...
-    id("io.github.solneo.dependency-conflict-analyzer")
+    id("io.github.solneo.dependency-conflict-analyzer") version "1.0.2"
 }
+```
+
+### Using legacy plugin application
+
+On your `build.gradle.kts` add:
+
+```kotlin
+apply(plugin = "io.github.solneo.dependency-conflict-analyzer")
 ```
 
 In order to use this plugin, you will also need to add the following to your
@@ -52,7 +73,6 @@ You can use `failOnConflict` extension for enable error in sync gradle:
 ```groovy
 dependencyConflictAnalyzer {
    failOnConflict = false
-   ...
 }
 ```
 
@@ -61,7 +81,6 @@ dependencyConflictAnalyzer {
 ```kotlin
 dependencyConflictAnalyzer {
    failOnConflict.set(false)
-   ...
 }
 ```
 
@@ -73,7 +92,6 @@ Also you can exclude artifact group or concrete library:
 dependencyConflictAnalyzer {
    excludeCheckingLibrariesGroup = Arrays.asList("com.example.code.group")
    excludeCheckingLibraries = Arrays.asList("com.example.code.group:artifact")
-   ...
 }
 ```
 
@@ -83,7 +101,6 @@ dependencyConflictAnalyzer {
 dependencyConflictAnalyzer {
    excludeCheckingLibrariesGroup.set(listOf("com.example.code.group"))
    excludeCheckingLibrariesset(listOf("com.example.code.group:artifact"))
-   ...
 }
 ```
 
