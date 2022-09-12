@@ -8,7 +8,7 @@ artifact with the highest version.
 
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/solneo/dependency-conflict-analyzer/CI)
 ![GitHub](https://img.shields.io/github/license/solneo/dependency-conflict-analyzer)
-![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.solneo.dependency-conflict-analyzer)
+[![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.solneo.dependency-conflict-analyzer)](https://plugins.gradle.org/plugin/io.github.solneo.dependency-conflict-analyzer)
 
 ## Usage in Groovy
 
