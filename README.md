@@ -6,8 +6,8 @@ relies on major versions of artifacts. This may happen when
 Uses the default Gradle dependency resolution strategy because it uses
 artifact with the highest version.
 
-[![GitHub Workflow Status] (https://img.shields.io/github/actions/workflow/status/solneo/dependency-conflict-analyzer/blank.yml)] (https://github.com/Solneo/dependency-conflict-analyzer/actions/workflows/blank.yml)
-[![GitHub](https://img.shields.io/github/license/solneo/dependency-conflict-analyzer)] (https://www.apache.org/licenses/LICENSE-2.0)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/solneo/dependency-conflict-analyzer/blank.yml)](https://github.com/Solneo/dependency-conflict-analyzer/actions/workflows/blank.yml)
+[![GitHub](https://img.shields.io/github/license/solneo/dependency-conflict-analyzer)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.solneo.dependency-conflict-analyzer)](https://plugins.gradle.org/plugin/io.github.solneo.dependency-conflict-analyzer)
 
 ## Usage in Groovy
