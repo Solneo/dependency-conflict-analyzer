@@ -34,7 +34,7 @@ In order to use this plugin, you will also need to add the following to your
 buildscript classpath:
 
 ```groovy
-classpath 'com.dchernyaev.dca:dependency-conflict-analyzer:1.0.2'
+classpath 'io.github.solneo:dependency-conflict-analyzer:1.0.2'
 ```
 
 ## Usage in KTS
