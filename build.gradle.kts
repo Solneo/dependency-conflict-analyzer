@@ -1,7 +1,5 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
-    id("com.gradle.plugin-publish") version "1.0.0"
+    id("com.gradle.plugin-publish") version "2.1.1"
     kotlin("jvm") version "1.5.31"
     `java-gradle-plugin`
     `kotlin-dsl`
@@ -10,20 +8,19 @@ plugins {
 }
 
 gradlePlugin {
+    website.set("https://github.com/Solneo/dependency-conflict-analyzer")
+    vcsUrl.set("https://github.com/Solneo/dependency-conflict-analyzer")
+
     plugins {
         create("dependencyConflictAnalyzer") {
             id = "io.github.solneo.dependency-conflict-analyzer"
             displayName = "Dependency Conflict Analyzer"
             description = "Help find conflict in gradle"
             implementationClass = "DependencyConflictAnalyzer"
+
+            tags.set(listOf("dependency", "conflict", "analyzer", "gradle"))
         }
     }
-}
-
-pluginBundle {
-    website = "https://github.com/Solneo/dependency-conflict-analyzer"
-    vcsUrl = "https://github.com/Solneo/dependency-conflict-analyzer"
-    tags = listOf("dependency", "conflict", "analyzer", "plugins")
 }
 
 publishing {
@@ -82,6 +79,10 @@ java {
     withJavadocJar()
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 signing {
     sign(publishing.publications["maven"])
 }
@@ -98,8 +99,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "1.8"
 }
