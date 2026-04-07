@@ -1,10 +1,10 @@
 import org.gradle.api.GradleException
 import org.gradle.api.artifacts.DependencyResolutionListener
 import org.gradle.api.artifacts.ResolvableDependencies
-import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
-import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentSelector
+import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -20,10 +20,13 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
     }
 
     override fun afterResolve(dependencies: ResolvableDependencies) {
+
         val buckets = mutableMapOf<String, DependencyBucket>()
         val excludeLibrariesGroupSet =
             extension.excludeCheckingLibrariesGroup.get().toSet()
         val excludeLibrariesSet = extension.excludeCheckingLibraries.get().toSet()
+        val parents = buildParents(dependencies.resolutionResult.root)
+        val pathCache = mutableMapOf<ComponentIdentifier, List<DependencySource>>()
 
         dependencies.resolutionResult.allDependencies.forEach { depResult ->
             when (val requested = depResult.requested) {
@@ -32,7 +35,7 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
                     val name = requested.module
                     val version = requested.version
 
-                    val key = "$group:$name".lowercase()
+                    val key = "$group:$name"
 
                     if (version.isBlank()) return@forEach
                     if (IGNORED_ARTIFACTS.contains(key) ||
@@ -44,18 +47,19 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
                         DependencyBucket(
                             group,
                             name,
+                            requested = mutableMapOf(),
                             selected = version
                         )
                     }
-                    val source = when (val id = depResult.from.id) {
-                        is ProjectComponentIdentifier -> id.projectPath
-                        is ModuleComponentIdentifier -> "${id.group}:${id.module}:${id.version}"
-                        else -> id.displayName
+
+                    val paths = pathCache.getOrPut(depResult.from.id) {
+                        findPathsToRoot(depResult.from.id, parents)
                     }
 
                     bucket.requested
-                        .getOrPut(version) { mutableSetOf() }
-                        .add(source)
+                        .getOrPut(version) { DependencyRequested(mutableSetOf()) }
+                        .sources.addAll(paths)
+
                     val selected = (depResult as? ResolvedDependencyResult)
                         ?.selected
                         ?.moduleVersion
@@ -91,17 +95,122 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         conflictSet.clear()
     }
 
+    fun findPaths(
+        node: ResolvedComponentResult,
+        target: String,
+        path: MutableList<String>,
+        result: MutableList<List<String>>,
+        visited: MutableSet<ComponentIdentifier>
+    ) {
+        if (!visited.add(node.id)) return
+
+        val current = node.moduleVersion?.let {
+            "${it.group}:${it.name}:${it.version}"
+        } ?: node.id.displayName
+
+        path.add(current)
+
+        val key = node.moduleVersion?.let {
+            "${it.group}:${it.name}"
+        }
+
+        if (key == target) {
+            result.add(path.toList())
+            path.removeAt(path.lastIndex)
+            visited.remove(node.id)
+            return
+        }
+
+        node.dependencies.forEach { dep ->
+            if (dep is ResolvedDependencyResult) {
+                findPaths(dep.selected, target, path, result, visited)
+            }
+        }
+
+        path.removeAt(path.lastIndex)
+        visited.remove(node.id)
+    }
+
+    fun findPathsToRoot(
+        target: ComponentIdentifier,
+        parents: Map<ComponentIdentifier, List<ComponentIdentifier>>
+    ): List<DependencySource> {
+
+        val result = mutableListOf<DependencySource>()
+
+        val queue: ArrayDeque<List<ComponentIdentifier>> = ArrayDeque()
+        queue.add(listOf(target))
+
+        while (queue.isNotEmpty()) {
+            val path = queue.removeFirst()
+
+            if (result.size >= MAX_PATHS) break
+
+            if (path.size > MAX_DEPTH) continue
+
+            val current = path.last()
+
+            val parentList = parents[current]
+
+            if (parentList.isNullOrEmpty()) {
+                result.add(DependencySource(path.reversed()))
+                continue
+            }
+
+            for (parent in parentList) {
+                if (parent in path) continue
+
+                val newPath = ArrayList<ComponentIdentifier>(path.size + 1)
+                newPath.addAll(path)
+                newPath.add(parent)
+
+                queue.add(newPath)
+            }
+        }
+
+        return result
+    }
+
+    fun buildParents(
+        root: ResolvedComponentResult
+    ): Map<ComponentIdentifier, List<ComponentIdentifier>> {
+
+        val parents = mutableMapOf<ComponentIdentifier, MutableList<ComponentIdentifier>>()
+        val visited = mutableSetOf<ComponentIdentifier>()
+
+        fun traverse(node: ResolvedComponentResult) {
+            if (!visited.add(node.id)) return
+
+            node.dependencies.forEach { dep ->
+                if (dep is ResolvedDependencyResult) {
+                    val child = dep.selected.id
+                    val parent = node.id
+
+                    parents.getOrPut(child) { mutableListOf() }.add(parent)
+
+                    traverse(dep.selected)
+                }
+            }
+        }
+
+        traverse(root)
+        return parents
+    }
+
     private fun printConflicts() {
         logger.info("\n")
         if (conflictSet.isNotEmpty()) {
-            logger.error("--------- Warning! ---------")
+            logger.warn("--------- Warning! ---------")
         }
-        conflictSet.forEach { logger.error(it) }
+        conflictSet.forEach { logger.warn(it) }
     }
 
 
     companion object {
+        private const val MAX_PATHS = 3
+        private const val MAX_DEPTH = 10
         val IGNORED_ARTIFACTS = setOf(
+            "org.jetbrains:annotations",
             "org.jetbrains.kotlin:kotlin-stdlib",
             "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
@@ -110,10 +219,3 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
     }
 
 }
-
-data class DependencyBucket(
-    val group: String,
-    val name: String,
-    val requested: MutableMap<String, MutableSet<String>> = mutableMapOf(),
-    var selected: String
-)

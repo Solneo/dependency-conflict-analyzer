@@ -28,11 +28,17 @@ class MajorVersionConflictStrategy : ConflictStrategy {
         }
 
         val msg = buildString {
-            append("Danger conflict with ${bucket.group}:${bucket.name} between:\n")
+            append("Version conflict detected: ${bucket.group}:${bucket.name}\n")
 
-            bucket.requested.forEach { (version, sources) ->
-                sources.forEach { source ->
-                    append("- version $version from --- $source\n")
+            bucket.requested.forEach { (version, dependencyRequested) ->
+                append("- version $version via:\n")
+                dependencyRequested.sources.forEach { source ->
+                    append("     - ")
+                    source.pathList.forEach { pathElement ->
+                        append("${pathElement.displayName} -> ")
+                    }
+                    append("${bucket.group}:${bucket.name}:$version")
+                    append("\n")
                 }
             }
 
