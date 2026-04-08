@@ -1,74 +1,44 @@
 # Dependency Conflict Analyzer Gradle Plugin
 
-This plugin scans dependencies
-during gradle build. Throws an error if there is a possible dependency conflict. In the current version, the plugin
-relies on major versions of artifacts. This may happen when
-Uses the default Gradle dependency resolution strategy because it uses
-artifact with the highest version.
+This plugin scans dependencies during Gradle sync and detects potential dependency conflicts.
+
+Gradle resolves dependency conflicts by selecting the highest version, which can silently introduce incompatibilities. This plugin helps detect such cases early and understand their root cause.
+
+It analyzes **major versions of artifacts** and highlights potentially incompatible upgrades selected by Gradle. The plugin also provides **dependency paths** for each conflicting version, helping you quickly identify which dependencies introduced the conflict and why it happened.
+
+Optionally, you can enable build failure on detected conflicts.
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/solneo/dependency-conflict-analyzer/blank.yml)](https://github.com/Solneo/dependency-conflict-analyzer/actions/workflows/blank.yml)
 [![GitHub](https://img.shields.io/github/license/solneo/dependency-conflict-analyzer)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.solneo.dependency-conflict-analyzer)](https://plugins.gradle.org/plugin/io.github.solneo.dependency-conflict-analyzer)
 
-## Usage in Groovy
+## Usage
 
-### Using the plugins DSL
+### Groovy
 
 On your `build.gradle` add:
 
 ```groovy
 plugins {
-  id "io.github.solneo.dependency-conflict-analyzer" version "1.0.2"
+  id "io.github.solneo.dependency-conflict-analyzer" version "1.2.0"
 }
 ```
 
-### Using legacy plugin application
-
-On your `build.gradle` add:
-
-```groovy
-apply plugin: 'io.github.solneo.dependency-conflict-analyzer'
-```
-
-In order to use this plugin, you will also need to add the following to your
-buildscript classpath:
-
-```groovy
-classpath 'io.github.solneo:dependency-conflict-analyzer:1.0.2'
-```
-
-## Usage in KTS
-
-### Using the plugins DSL
+### Kotlin DSL
 
 On your `build.gradle.kts` add:
 
-```kotlin
+```kotlin 
 plugins {
-    id("io.github.solneo.dependency-conflict-analyzer") version "1.0.2"
+    id("io.github.solneo.dependency-conflict-analyzer") version "1.2.0"
 }
-```
-
-### Using legacy plugin application
-
-On your `build.gradle.kts` add:
-
-```kotlin
-apply(plugin = "io.github.solneo.dependency-conflict-analyzer")
-```
-
-In order to use this plugin, you will also need to add the following to your
-buildscript classpath:
-
-```kotlin
-classpath("io.github.solneo:dependency-conflict-analyzer:1.0.2")
 ```
 
 ## Configuration
 
-You can use `failOnConflict` extension for enable error in sync gradle:
+You can enable build failure on detected conflicts using the `failOnConflict` option:
 
-#### In groovy:
+### Groovy
 
 ```groovy
 dependencyConflictAnalyzer {
@@ -76,7 +46,7 @@ dependencyConflictAnalyzer {
 }
 ```
 
-#### In KTS:
+### Kotlin DSL
 
 ```kotlin
 dependencyConflictAnalyzer {
@@ -84,37 +54,39 @@ dependencyConflictAnalyzer {
 }
 ```
 
-Also you can exclude artifact group or concrete library:
+You can also exclude specific groups or artifacts from analysis:
 
-#### In groovy:
+### Groovy
 
 ```groovy
 dependencyConflictAnalyzer {
-   excludeCheckingLibrariesGroup = Arrays.asList("com.example.code.group")
-   excludeCheckingLibraries = Arrays.asList("com.example.code.group:artifact")
+   excludeCheckingLibrariesGroup = ["com.example.code.group"]
+   excludeCheckingLibraries = ["com.example.code.group:artifact"]
 }
 ```
 
-#### In KTS:
+### Kotlin DSL
 
 ```kotlin
 dependencyConflictAnalyzer {
    excludeCheckingLibrariesGroup.set(listOf("com.example.code.group"))
-   excludeCheckingLibrariesset(listOf("com.example.code.group:artifact"))
+   excludeCheckingLibraries.set(listOf("com.example.code.group:artifact"))
 }
 ```
 
-This displays a report to the console.
+The plugin outputs a report to the console:
 
 
-<details open>
+<details>
 <summary>Text Report</summary>
 
 ```
---------- Warning! ---------
-Danger conflict with com.google.code.gson:gson between:
-- version 1.7.1 from --- project :app
-- version 2.8.9 from --- redis.clients:jedis:4.1.0
+Danger conflict with com.google.guava:guava between:
+- version 32.1.3-jre via:
+     - project :app -> com.google.guava:guava:32.1.3-jre
+- version 19.0 via:
+     - project :app -> com.google.inject:guice:4.1.0 -> com.google.guava:guava:19.0
+→ using 32.1.3-jre
 ```
-Note: dependencies used only fo log example
+Note: dependencies are used only as an example
 </details>
