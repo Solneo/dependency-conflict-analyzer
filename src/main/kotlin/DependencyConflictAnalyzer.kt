@@ -7,15 +7,18 @@ class DependencyConflictAnalyzer : Plugin<Project> {
         val extension =
             project.extensions.create<DependencyConflictAnalyzerExtension>("dependencyConflictAnalyzer")
 
-        project.task("setDependencyInspector") {
-            group = "dependencies"
-            val dependencyInspector = DependencyInspector(extension)
+        val dependencyInspector = DependencyInspector(extension)
 
-            project.configurations.all {
-                if (name.contains("ompile")) {
+        project.configurations
+            .matching {
+                it.name.endsWith("CompileClasspath") &&
+                        !it.name.contains("Test") &&
+                        !it.name.contains("AndroidTest")
+            }
+            .all {
+                if (isCanBeResolved) {
                     incoming.afterResolve(dependencyInspector::afterResolve)
                 }
             }
-        }
     }
 }

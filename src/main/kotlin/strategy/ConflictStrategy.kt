@@ -1,7 +1,7 @@
 package strategy
 
-import org.gradle.api.artifacts.result.DependencyResult
+import DependencyBucket
 
 interface ConflictStrategy {
-    fun analyzeConflict(depResult: DependencyResult): AnalyzedConflict
+    fun analyzeConflict(depResult: DependencyBucket): AnalyzedConflict
 }
