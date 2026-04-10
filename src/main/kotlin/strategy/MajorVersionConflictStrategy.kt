@@ -38,29 +38,22 @@ class MajorVersionConflictStrategy : ConflictStrategy {
                 append("- version $version via:\n")
                 dependencyRequested.sources.forEach { source ->
                     append("     - ")
-
                     source.path.forEachIndexed { index, pathElement ->
-                        if (index > 0) {
+                        if (index == 0) {
+                            append("${pathElement.displayName} -> ")
+                        } else {
                             val requested = source.requestedVersions[pathElement]
                             if (requested != null) {
-                                val base = formatId(pathElement)
-                                val requested = source.requestedVersions[pathElement]
-
-                                if (requested != null) {
-                                    append("$base:$requested -> ")
-                                } else {
-                                    append("${pathElement.displayName} -> ")
-                                }
-                                return@forEachIndexed
+                                append("${formatId(pathElement)}:$requested -> ")
+                            } else {
+                                append("${pathElement.displayName} -> ")
                             }
                         }
-                        append("${pathElement.displayName} -> ")
                     }
                     append("${bucket.group}:${bucket.name}:$version")
                     append("\n")
                 }
             }
-
             append("→ using ${bucket.selected}\n")
         }
         val key = "${bucket.group}:${bucket.name}"

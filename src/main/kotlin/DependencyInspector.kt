@@ -48,9 +48,9 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
             val name = requested.module
             val version = requested.version
             val key = "$group:$name"
-            if (fromId == dependencies.resolutionResult.root.id) {
-                edgeRequestedVersion[fromId to toId] = version
-            }
+
+            edgeRequestedVersion[fromId to toId] = version
+
 
             if (version.isBlank()) return@forEach
             if (IGNORED_ARTIFACTS.contains(key) ||
