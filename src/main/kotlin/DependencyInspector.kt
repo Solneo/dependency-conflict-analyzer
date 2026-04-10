@@ -1,4 +1,4 @@
-import org.gradle.api.GradleException
+import java.util.concurrent.ConcurrentHashMap
 import org.gradle.api.artifacts.DependencyResolutionListener
 import org.gradle.api.artifacts.ResolvableDependencies
 import org.gradle.api.artifacts.component.ComponentIdentifier
@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory
 class DependencyInspector(private val extension: DependencyConflictAnalyzerExtension) :
     DependencyResolutionListener {
 
-    private val conflictSet = mutableSetOf<String>()
+    val conflictSet = ConcurrentHashMap<String, DependencyBucket>()
 
     private val logger: Logger = LoggerFactory.getLogger(DependencyInspector::class.java)
     override fun beforeResolve(dependencies: ResolvableDependencies) {
@@ -28,13 +28,19 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         val parents = buildParents(dependencies.resolutionResult.root)
         val pathCache = mutableMapOf<ComponentIdentifier, List<DependencySource>>()
 
+        val directDependencies = dependencies.resolutionResult.root.dependencies
+            .filterIsInstance<ResolvedDependencyResult>()
+            .filter { !it.isConstraint }
+            .mapNotNull { it.requested as? ModuleComponentSelector }
+            .map { "${it.group}:${it.module}" }
+            .toSet()
+
         dependencies.resolutionResult.allDependencies.forEach { depResult ->
             when (val requested = depResult.requested) {
                 is ModuleComponentSelector -> {
                     val group = requested.group
                     val name = requested.module
                     val version = requested.version
-
                     val key = "$group:$name"
 
                     if (version.isBlank()) return@forEach
@@ -42,6 +48,19 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
                         excludeLibrariesGroupSet.contains(group) ||
                         excludeLibrariesSet.contains(key)
                     ) return@forEach
+
+                    val isFromRoot = depResult.from.id == dependencies.resolutionResult.root.id
+                    val isConstraint = (depResult as? ResolvedDependencyResult)?.isConstraint ?: false
+
+                    if (isFromRoot) {
+                        println("FROM ROOT: $key:$version isInDirect: ${directDependencies.contains(key)} isConstraint: $isConstraint selected: ${(depResult as? ResolvedDependencyResult)?.selected?.moduleVersion?.version}")
+                    }
+
+                    if (isFromRoot) {
+                        if (!directDependencies.contains(key) || isConstraint) return@forEach
+                    } else {
+                        if (isConstraint) return@forEach
+                    }
 
                     val bucket = buckets.getOrPut(key) {
                         DependencyBucket(
@@ -83,16 +102,16 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         buckets.forEach { bucket ->
             val conflict = extension.strategy.analyzeConflict(bucket.value)
             if (conflict.danger) {
-                conflictSet.add(conflict.msg)
+                conflictSet.merge(conflict.key, bucket.value) { existing, new ->
+                    new.requested.forEach { (version, requested) ->
+                        existing.requested
+                            .getOrPut(version) { DependencyRequested(mutableSetOf()) }
+                            .sources.addAll(requested.sources)
+                    }
+                    existing
+                }
             }
         }
-
-        printConflicts()
-        if (extension.failOnConflict.get()) {
-            conflictSet.firstOrNull()
-                ?.let { throw GradleException("$it\n you can ignore this issue with parameter failOnConflict") }
-        }
-        conflictSet.clear()
     }
 
     fun findPaths(
@@ -182,7 +201,7 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
             if (!visited.add(node.id)) return
 
             node.dependencies.forEach { dep ->
-                if (dep is ResolvedDependencyResult) {
+                if (dep is ResolvedDependencyResult && !dep.isConstraint) {
                     val child = dep.selected.id
                     val parent = node.id
 
@@ -197,12 +216,15 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         return parents
     }
 
-    private fun printConflicts() {
+    fun printConflicts() {
         logger.info("\n")
         if (conflictSet.isNotEmpty()) {
             logger.warn("--------- Warning! ---------")
         }
-        conflictSet.forEach { logger.warn(it) }
+        conflictSet.values.forEach { bucket ->
+            val conflict = extension.strategy.analyzeConflict(bucket)
+            if (conflict.danger) println(conflict.msg)
+        }
     }
 
 
