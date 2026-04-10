@@ -34,8 +34,7 @@ class MajorVersionConflictStrategy : ConflictStrategy {
 
             bucket.requested.forEach { (version, dependencyRequested) ->
                 append("- version $version via:\n")
-                val deduplicated = deduplicateSources(dependencyRequested.sources)
-                deduplicated.forEach { source ->
+                dependencyRequested.sources.forEach { source ->
                     append("     - ")
                     source.pathList.forEach { pathElement ->
                         append("${pathElement.displayName} -> ")
@@ -50,18 +49,6 @@ class MajorVersionConflictStrategy : ConflictStrategy {
         val key = "${bucket.group}:${bucket.name}"
 
         return AnalyzedConflict(true, msg, key, sourcesCount)
-    }
-
-    fun deduplicateSources(sources: Set<DependencySource>): Set<DependencySource> {
-        return sources.filter { candidate ->
-            val candidateNames = candidate.pathList.map { it.displayName }
-            val dominated = sources.any { other ->
-                if (other == candidate) return@any false
-                val otherNames = other.pathList.map { it.displayName }
-                otherNames.size > candidateNames.size && otherNames.takeLast(candidateNames.size) == candidateNames
-            }
-            !dominated
-        }.toSet()
     }
 
 }

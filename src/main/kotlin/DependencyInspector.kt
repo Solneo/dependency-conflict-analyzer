@@ -50,11 +50,8 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
                     ) return@forEach
 
                     val isFromRoot = depResult.from.id == dependencies.resolutionResult.root.id
-                    val isConstraint = (depResult as? ResolvedDependencyResult)?.isConstraint ?: false
-
-                    if (isFromRoot) {
-                        println("FROM ROOT: $key:$version isInDirect: ${directDependencies.contains(key)} isConstraint: $isConstraint selected: ${(depResult as? ResolvedDependencyResult)?.selected?.moduleVersion?.version}")
-                    }
+                    val isConstraint =
+                        (depResult as? ResolvedDependencyResult)?.isConstraint ?: false
 
                     if (isFromRoot) {
                         if (!directDependencies.contains(key) || isConstraint) return@forEach
@@ -121,8 +118,6 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         result: MutableList<List<String>>,
         visited: MutableSet<ComponentIdentifier>
     ) {
-        if (!visited.add(node.id)) return
-
         val current = node.moduleVersion?.let {
             "${it.group}:${it.name}:${it.version}"
         } ?: node.id.displayName
@@ -195,19 +190,18 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
     ): Map<ComponentIdentifier, List<ComponentIdentifier>> {
 
         val parents = mutableMapOf<ComponentIdentifier, MutableList<ComponentIdentifier>>()
-        val visited = mutableSetOf<ComponentIdentifier>()
+        val visitedEdges = mutableSetOf<Pair<ComponentIdentifier, ComponentIdentifier>>()
 
         fun traverse(node: ResolvedComponentResult) {
-            if (!visited.add(node.id)) return
-
             node.dependencies.forEach { dep ->
                 if (dep is ResolvedDependencyResult && !dep.isConstraint) {
                     val child = dep.selected.id
                     val parent = node.id
 
-                    parents.getOrPut(child) { mutableListOf() }.add(parent)
-
-                    traverse(dep.selected)
+                    if (visitedEdges.add(child to parent)) {
+                        parents.getOrPut(child) { mutableListOf() }.add(parent)
+                        traverse(dep.selected)
+                    }
                 }
             }
         }
