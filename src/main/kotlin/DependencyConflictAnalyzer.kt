@@ -15,7 +15,7 @@ class DependencyConflictAnalyzer : Plugin<Project> {
         val dependencyInspector = DependencyInspector(extension)
 
         project.rootProject.allprojects {
-            val subproject = this
+            println("${this.displayName}")
             configurations
                 .matching {
                     it.name.endsWith("CompileClasspath") &&
@@ -32,12 +32,7 @@ class DependencyConflictAnalyzer : Plugin<Project> {
         project.gradle.addBuildListener(object : BuildAdapter() {
             override fun buildFinished(result: BuildResult) {
                 dependencyInspector.printConflicts()
-                if (extension.failOnConflict.get()) {
-                    dependencyInspector.conflictSet.values.firstOrNull()
-                        ?.let { throw GradleException("$it\n you can ignore this issue with parameter failOnConflict") }
-                }
-
-                dependencyInspector.conflictSet.clear()
+                dependencyInspector.clear()
             }
         })
     }

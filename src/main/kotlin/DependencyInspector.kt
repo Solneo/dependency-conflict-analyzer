@@ -1,7 +1,10 @@
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.text.contains
+import org.gradle.api.GradleException
 import org.gradle.api.artifacts.DependencyResolutionListener
 import org.gradle.api.artifacts.ResolvableDependencies
 import org.gradle.api.artifacts.component.ComponentIdentifier
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
 import org.gradle.api.artifacts.component.ProjectComponentSelector
 import org.gradle.api.artifacts.result.ResolvedComponentResult
@@ -13,6 +16,12 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
     DependencyResolutionListener {
 
     val conflictSet = ConcurrentHashMap<String, DependencyBucket>()
+    private val globalParents =
+        ConcurrentHashMap<ComponentIdentifier, MutableSet<ComponentIdentifier>>()
+    private val globalRequested =
+        ConcurrentHashMap<String, ConcurrentHashMap<String, MutableSet<ComponentIdentifier>>>()
+    private val globalSelected = ConcurrentHashMap<String, String>()
+    private val pathCache = ConcurrentHashMap<ComponentIdentifier, List<DependencySource>>()
 
     private val logger: Logger = LoggerFactory.getLogger(DependencyInspector::class.java)
     override fun beforeResolve(dependencies: ResolvableDependencies) {
@@ -20,13 +29,8 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
     }
 
     override fun afterResolve(dependencies: ResolvableDependencies) {
-
-        val buckets = mutableMapOf<String, DependencyBucket>()
-        val excludeLibrariesGroupSet =
-            extension.excludeCheckingLibrariesGroup.get().toSet()
+        val excludeLibrariesGroupSet = extension.excludeCheckingLibrariesGroup.get().toSet()
         val excludeLibrariesSet = extension.excludeCheckingLibraries.get().toSet()
-        val parents = buildParents(dependencies.resolutionResult.root)
-        val pathCache = mutableMapOf<ComponentIdentifier, List<DependencySource>>()
 
         val directDependencies = dependencies.resolutionResult.root.dependencies
             .filterIsInstance<ResolvedDependencyResult>()
@@ -36,77 +40,44 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
             .toSet()
 
         dependencies.resolutionResult.allDependencies.forEach { depResult ->
-            when (val requested = depResult.requested) {
-                is ModuleComponentSelector -> {
-                    val group = requested.group
-                    val name = requested.module
-                    val version = requested.version
-                    val key = "$group:$name"
+            if (depResult !is ResolvedDependencyResult) return@forEach
+            if (depResult.isConstraint) return@forEach
 
-                    if (version.isBlank()) return@forEach
-                    if (IGNORED_ARTIFACTS.contains(key) ||
-                        excludeLibrariesGroupSet.contains(group) ||
-                        excludeLibrariesSet.contains(key)
-                    ) return@forEach
+            val fromId = depResult.from.id
+            val toId = depResult.selected.id
 
-                    val isFromRoot = depResult.from.id == dependencies.resolutionResult.root.id
-                    val isConstraint =
-                        (depResult as? ResolvedDependencyResult)?.isConstraint ?: false
+            globalParents
+                .getOrPut(toId) { ConcurrentHashMap.newKeySet() }
+                .add(fromId)
 
-                    if (isFromRoot) {
-                        if (!directDependencies.contains(key) || isConstraint) return@forEach
-                    } else {
-                        if (isConstraint) return@forEach
-                    }
+            val requested = depResult.requested as? ModuleComponentSelector ?: return@forEach
+            val group = requested.group
+            val name = requested.module
+            val version = requested.version
+            val key = "$group:$name"
 
-                    val bucket = buckets.getOrPut(key) {
-                        DependencyBucket(
-                            group,
-                            name,
-                            requested = mutableMapOf(),
-                            selected = version
-                        )
-                    }
+            if (version.isBlank()) return@forEach
+            if (IGNORED_ARTIFACTS.contains(key) ||
+                excludeLibrariesGroupSet.contains(group) ||
+                excludeLibrariesSet.contains(key)
+            ) return@forEach
 
-                    val paths = pathCache.getOrPut(depResult.from.id) {
-                        findPathsToRoot(depResult.from.id, parents)
-                    }
-
-                    bucket.requested
-                        .getOrPut(version) { DependencyRequested(mutableSetOf()) }
-                        .sources.addAll(paths)
-
-                    val selected = (depResult as? ResolvedDependencyResult)
-                        ?.selected
-                        ?.moduleVersion
-
-                    if (selected != null) {
-                        bucket.selected = selected.version
-                    }
-                }
-
-                is ProjectComponentSelector -> {
-                    val projectPath = requested.projectPath
-                    //add later module dep problems
-                }
-
-                else -> {
-                    // ignore
-                }
+            val isFromRootDebug = depResult.from.id == dependencies.resolutionResult.root.id
+            if (isFromRootDebug) {
+                val req = depResult.requested as? ModuleComponentSelector
+                println("ALL FROM ROOT [${dependencies.resolutionResult.root.id.displayName}]: ${req?.group}:${req?.module}:${req?.version} isConstraint=${depResult.isConstraint}")
             }
-        }
 
-        buckets.forEach { bucket ->
-            val conflict = extension.strategy.analyzeConflict(bucket.value)
-            if (conflict.danger) {
-                conflictSet.merge(conflict.key, bucket.value) { existing, new ->
-                    new.requested.forEach { (version, requested) ->
-                        existing.requested
-                            .getOrPut(version) { DependencyRequested(mutableSetOf()) }
-                            .sources.addAll(requested.sources)
-                    }
-                    existing
-                }
+            val isFromRoot = fromId == dependencies.resolutionResult.root.id
+            if (isFromRoot && (!directDependencies.contains(key) || depResult.isConstraint)) return@forEach
+
+            globalRequested
+                .getOrPut(key) { ConcurrentHashMap() }
+                .getOrPut(version) { ConcurrentHashMap.newKeySet() }
+                .add(fromId)
+
+            depResult.selected.moduleVersion?.version?.let { selected ->
+                globalSelected[key] = selected
             }
         }
     }
@@ -210,21 +181,118 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         return parents
     }
 
-    fun printConflicts() {
-        logger.info("\n")
-        if (conflictSet.isNotEmpty()) {
-            logger.warn("--------- Warning! ---------")
+    fun normalizeSources(sources: Set<DependencySource>): Set<DependencySource> {
+        return sources
+            .groupBy { source ->
+                normalizePath(source.pathList)
+            }
+            .values
+            .map { paths ->
+                paths.maxWithOrNull(
+                    compareBy<DependencySource> { normalizePath(it.pathList).size }
+                        .thenBy { it.pathList.size }
+                )!!
+            }
+            .toSet()
+    }
+
+    fun normalizePath(path: List<ComponentIdentifier>): List<String> {
+        return path.mapNotNull { id ->
+            val mv = (id as? ModuleComponentIdentifier)?.let {
+                "${it.group}:${it.module}"
+            }
+            mv
         }
-        conflictSet.values.forEach { bucket ->
+    }
+
+    fun removeWeakerPaths(sources: Set<DependencySource>): Set<DependencySource> {
+        val list = sources.toList()
+
+        return list.filterNot { candidate ->
+            list.any { other ->
+                if (candidate === other) return@any false
+
+                val c = candidate.pathList
+                val o = other.pathList
+
+                if (o.size <= c.size) return@any false
+
+                // разные root
+                val differentRoot = o.first() != c.first()
+                if (!differentRoot) return@any false
+
+                // candidate является суффиксом other
+                val offset = o.size - c.size
+                o.subList(offset, o.size) == c
+            }
+        }.toSet()
+    }
+
+    fun analyzeAndPrint() {
+        // строим parents как Map<ComponentIdentifier, List<ComponentIdentifier>>
+        val parents = globalParents.mapValues { it.value.toList() }
+
+        val pathCache = mutableMapOf<ComponentIdentifier, List<DependencySource>>()
+
+        val buckets = globalRequested.map { (key, versionMap) ->
+            val (group, name) = key.split(":")
+            val requested = versionMap.entries.associate { (version, requesters) ->
+                val sources = requesters.flatMap { requester ->
+                    pathCache.getOrPut(requester) {
+                        findPathsToRoot(requester, parents)
+                    }
+                }.toMutableSet()
+                version to DependencyRequested(sources)
+            }.toMutableMap()
+
+            DependencyBucket(group, name, requested, globalSelected[key] ?: "")
+        }
+
+        buckets.forEach { bucket ->
             val conflict = extension.strategy.analyzeConflict(bucket)
             if (conflict.danger) println(conflict.msg)
         }
     }
 
+    fun printConflicts() {
+        val parents = globalParents.mapValues { it.value.toList() }
+
+        globalRequested.forEach { (key, versionMap) ->
+            val parts = key.split(":")
+            val group = parts[0]
+            val name = parts[1]
+
+            val requested = versionMap.entries.associate { (version, requesters) ->
+                val sources = requesters.flatMap { requester ->
+                    pathCache.getOrPut(requester) {
+                        findPathsToRoot(requester, parents)
+                    }
+                }.toMutableSet()
+                version to DependencyRequested(sources)
+            }.toMutableMap()
+
+            val bucket = DependencyBucket(group, name, requested, globalSelected[key] ?: "")
+            val conflict = extension.strategy.analyzeConflict(bucket)
+            if (conflict.danger) {
+                logger.warn(conflict.msg)
+                if (extension.failOnConflict.get()) {
+                    throw GradleException("${conflict.msg}\n you can ignore this issue with parameter failOnConflict")
+                }
+            }
+        }
+    }
+
+    fun clear() {
+        globalParents.clear()
+        globalRequested.clear()
+        globalSelected.clear()
+        pathCache.clear()
+    }
+
 
     companion object {
-        private const val MAX_PATHS = 3
-        private const val MAX_DEPTH = 10
+        private const val MAX_PATHS = 10
+        private const val MAX_DEPTH = 15
         val IGNORED_ARTIFACTS = setOf(
             "org.jetbrains:annotations",
             "org.jetbrains.kotlin:kotlin-stdlib",
