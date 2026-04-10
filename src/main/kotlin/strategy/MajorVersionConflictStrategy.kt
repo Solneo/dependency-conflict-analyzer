@@ -2,6 +2,8 @@ package strategy
 
 import DependencyBucket
 import DependencySource
+import org.gradle.api.artifacts.component.ComponentIdentifier
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -36,7 +38,22 @@ class MajorVersionConflictStrategy : ConflictStrategy {
                 append("- version $version via:\n")
                 dependencyRequested.sources.forEach { source ->
                     append("     - ")
-                    source.pathList.forEach { pathElement ->
+
+                    source.path.forEachIndexed { index, pathElement ->
+                        if (index > 0) {
+                            val requested = source.requestedVersions[pathElement]
+                            if (requested != null) {
+                                val base = formatId(pathElement)
+                                val requested = source.requestedVersions[pathElement]
+
+                                if (requested != null) {
+                                    append("$base:$requested -> ")
+                                } else {
+                                    append("${pathElement.displayName} -> ")
+                                }
+                                return@forEachIndexed
+                            }
+                        }
                         append("${pathElement.displayName} -> ")
                     }
                     append("${bucket.group}:${bucket.name}:$version")
@@ -49,6 +66,13 @@ class MajorVersionConflictStrategy : ConflictStrategy {
         val key = "${bucket.group}:${bucket.name}"
 
         return AnalyzedConflict(true, msg, key, sourcesCount)
+    }
+
+    fun formatId(id: ComponentIdentifier): String {
+        return when (id) {
+            is ModuleComponentIdentifier -> "${id.group}:${id.module}"
+            else -> id.displayName
+        }
     }
 
 }
