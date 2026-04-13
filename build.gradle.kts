@@ -16,7 +16,7 @@ gradlePlugin {
             description = "Help find conflict in gradle"
             implementationClass = "DependencyConflictAnalyzer"
 
-            tags.set(listOf("dependency", "conflict", "analyzer", "gradle"))
+            tags.set(listOf("dependency", "conflict", "analyzer", "diagnostics"))
         }
     }
 }

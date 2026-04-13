@@ -20,7 +20,7 @@ On your `build.gradle` add:
 
 ```groovy
 plugins {
-  id "io.github.solneo.dependency-conflict-analyzer" version "1.2.4"
+  id "io.github.solneo.dependency-conflict-analyzer" version "1.3.0"
 }
 ```
 
@@ -30,7 +30,7 @@ On your `build.gradle.kts` add:
 
 ```kotlin 
 plugins {
-    id("io.github.solneo.dependency-conflict-analyzer") version "1.2.4"
+    id("io.github.solneo.dependency-conflict-analyzer") version "1.3.0"
 }
 ```
 
