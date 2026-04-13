@@ -12,5 +12,6 @@ data class DependencyRequested(
 )
 
 data class DependencySource(
-    val pathList: List<ComponentIdentifier>
+    val path: List<ComponentIdentifier>,
+    val requestedVersions: Map<ComponentIdentifier, String> = emptyMap()
 )

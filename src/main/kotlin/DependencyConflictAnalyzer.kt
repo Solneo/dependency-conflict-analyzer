@@ -1,3 +1,5 @@
+import org.gradle.BuildAdapter
+import org.gradle.BuildResult
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
@@ -9,16 +11,27 @@ class DependencyConflictAnalyzer : Plugin<Project> {
 
         val dependencyInspector = DependencyInspector(extension)
 
-        project.configurations
-            .matching {
-                it.name.endsWith("CompileClasspath") &&
-                        !it.name.contains("Test") &&
-                        !it.name.contains("AndroidTest")
-            }
-            .all {
-                if (isCanBeResolved) {
-                    incoming.afterResolve(dependencyInspector::afterResolve)
+        project.rootProject.allprojects {
+            configurations
+                .matching {
+                    it.name.endsWith("CompileClasspath") &&
+                            !it.name.contains("Test") &&
+                            !it.name.contains("AndroidTest")
                 }
+                .all {
+                    if (isCanBeResolved) {
+                        incoming.afterResolve(dependencyInspector::afterResolve)
+                        dependencyInspector.clearCache()
+                    }
+                }
+        }
+
+        project.gradle.addBuildListener(object : BuildAdapter() {
+            override fun buildFinished(result: BuildResult) {
+                dependencyInspector.printConflicts()
+                dependencyInspector.clear()
             }
+        })
     }
 }
+
