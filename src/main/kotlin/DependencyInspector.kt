@@ -4,7 +4,6 @@ import org.gradle.api.artifacts.DependencyResolutionListener
 import org.gradle.api.artifacts.ResolvableDependencies
 import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
-import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -18,8 +17,8 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
     private val globalParents =
         ConcurrentHashMap<ComponentIdentifier, MutableSet<ComponentIdentifier>>()
     private val globalRequested =
-        ConcurrentHashMap<String, ConcurrentHashMap<String, MutableSet<Requester>>>()
-    private val globalSelected = ConcurrentHashMap<String, String>()
+        ConcurrentHashMap<ModuleKey, ConcurrentHashMap<String, MutableSet<Requester>>>()
+    private val globalSelected = ConcurrentHashMap<ModuleKey, String>()
     private val pathCache = ConcurrentHashMap<ComponentIdentifier, List<DependencySource>>()
 
     private val logger: Logger = LoggerFactory.getLogger(DependencyInspector::class.java)
@@ -47,15 +46,15 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
             val group = requested.group
             val name = requested.module
             val version = requested.version
-            val key = "$group:$name"
+            val key = ModuleKey(group, name)
 
             edgeRequestedVersion[fromId to toId] = version
 
-
             if (version.isBlank()) return@forEach
-            if (IGNORED_ARTIFACTS.contains(key) ||
+            val stringKey = "$group:$name"
+            if (IGNORED_ARTIFACTS.contains(stringKey) ||
                 excludeLibrariesGroupSet.contains(group) ||
-                excludeLibrariesSet.contains(key)
+                excludeLibrariesSet.contains(stringKey)
             ) return@forEach
             val isDirect = fromId == rootId
 
@@ -76,41 +75,7 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         }
     }
 
-    fun findPaths(
-        node: ResolvedComponentResult,
-        target: String,
-        path: MutableList<String>,
-        result: MutableList<List<String>>,
-        visited: MutableSet<ComponentIdentifier>
-    ) {
-        val current = node.moduleVersion?.let {
-            "${it.group}:${it.name}:${it.version}"
-        } ?: node.id.displayName
-
-        path.add(current)
-
-        val key = node.moduleVersion?.let {
-            "${it.group}:${it.name}"
-        }
-
-        if (key == target) {
-            result.add(path.toList())
-            path.removeAt(path.lastIndex)
-            visited.remove(node.id)
-            return
-        }
-
-        node.dependencies.forEach { dep ->
-            if (dep is ResolvedDependencyResult) {
-                findPaths(dep.selected, target, path, result, visited)
-            }
-        }
-
-        path.removeAt(path.lastIndex)
-        visited.remove(node.id)
-    }
-
-    fun findPathsToRoot(
+    internal fun findPathsToRoot(
         target: ComponentIdentifier,
         parents: Map<ComponentIdentifier, List<ComponentIdentifier>>
     ): List<DependencySource> {
@@ -150,8 +115,6 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
                 continue
             }
 
-
-
             for (parent in parentList) {
                 if (parent in path) continue
 
@@ -166,26 +129,11 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         return result
     }
 
-    fun printConflicts() {
-        globalRequested.forEach { (key, versionMap) ->
-            versionMap.forEach { (version, requesters) ->
-                requesters.forEach {
-                    if (it.isDirect) {
-                        println("DIRECT FOUND: $key:$version from ${it.root.displayName}")
-                    }
-                }
-            }
-        }
-
+    internal fun printConflicts() {
 
         val parents = globalParents.mapValues { it.value.toList() }
 
         globalRequested.forEach { (key, versionMap) ->
-            val parts = key.split(":")
-            val group = parts[0]
-            val name = parts[1]
-
-
             val requested = versionMap.entries.associate { (version, requesters) ->
                 val sources = requesters.flatMap { requester ->
                     pathCache.getOrPut(requester.id) {
@@ -195,7 +143,7 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
                 version to DependencyRequested(sources)
             }.toMutableMap()
 
-            val bucket = DependencyBucket(group, name, requested, globalSelected[key] ?: "")
+            val bucket = DependencyBucket(key.group, key.name, requested, globalSelected[key] ?: "")
             val conflict = extension.strategy.analyzeConflict(bucket)
             if (conflict.danger) {
                 logger.warn(conflict.msg)
@@ -206,17 +154,19 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         }
     }
 
-    fun clear() {
-        globalParents.clear()
-        globalRequested.clear()
-        globalSelected.clear()
+    internal fun clearCache() {
         pathCache.clear()
     }
 
+    internal fun clear() {
+        globalParents.clear()
+        globalRequested.clear()
+        globalSelected.clear()
+    }
 
     companion object {
-        private const val MAX_PATHS = 10
-        private const val MAX_DEPTH = 15
+        internal const val MAX_PATHS = 10
+        internal const val MAX_DEPTH = 15
         val IGNORED_ARTIFACTS = setOf(
             "org.jetbrains:annotations",
             "org.jetbrains.kotlin:kotlin-stdlib",
@@ -232,4 +182,9 @@ data class Requester(
     val id: ComponentIdentifier,
     val root: ComponentIdentifier,
     val isDirect: Boolean
+)
+
+data class ModuleKey(
+    val group: String,
+    val name: String
 )

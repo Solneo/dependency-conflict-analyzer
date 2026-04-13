@@ -1,7 +1,6 @@
 package strategy
 
 import DependencyBucket
-import DependencySource
 import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.slf4j.Logger
@@ -10,12 +9,9 @@ import org.slf4j.LoggerFactory
 class MajorVersionConflictStrategy : ConflictStrategy {
 
     private val logger: Logger = LoggerFactory.getLogger(MajorVersionConflictStrategy::class.java)
-    private val tempConflictHashMap = HashMap<String, DependencyNode>()
 
     override fun analyzeConflict(bucket: DependencyBucket): AnalyzedConflict {
-        val sourcesCount = bucket.requested.values.sumOf { it.sources.size }
-
-        val uniqueVersions = bucket.requested.keys
+            val uniqueVersions = bucket.requested.keys
             .filter { it.isNotBlank() }
             .toSet()
 
@@ -56,9 +52,8 @@ class MajorVersionConflictStrategy : ConflictStrategy {
             }
             append("→ using ${bucket.selected}\n")
         }
-        val key = "${bucket.group}:${bucket.name}"
 
-        return AnalyzedConflict(true, msg, key, sourcesCount)
+        return AnalyzedConflict(true, msg)
     }
 
     fun formatId(id: ComponentIdentifier): String {

@@ -38,6 +38,8 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    testImplementation(gradleApi())
+    testImplementation(gradleTestKit())
 }
 
 tasks.test {
