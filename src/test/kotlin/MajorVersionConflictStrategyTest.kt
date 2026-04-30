@@ -1,3 +1,6 @@
+import inspector.DependencyBucket
+import inspector.DependencyRequested
+import inspector.DependencySource
 import org.gradle.api.internal.artifacts.DefaultModuleIdentifier
 import org.gradle.internal.component.external.model.DefaultModuleComponentIdentifier
 import org.junit.jupiter.api.Assertions.*
@@ -20,7 +23,19 @@ class MajorVersionConflictStrategyTest {
         selected: String
     ): DependencyBucket {
         val requested = versions.associateWith { version ->
-            DependencyRequested(mutableSetOf(DependencySource(listOf(makeId("project", "app", "")))))
+            DependencyRequested(
+                mutableSetOf(
+                    DependencySource(
+                        listOf(
+                            makeId(
+                                "project",
+                                "app",
+                                ""
+                            )
+                        )
+                    )
+                )
+            )
         }.toMutableMap()
         return DependencyBucket(group, name, requested, selected)
     }

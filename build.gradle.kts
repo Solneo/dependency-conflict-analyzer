@@ -1,6 +1,6 @@
 plugins {
     id("com.gradle.plugin-publish") version "2.1.1"
-    kotlin("jvm") version "1.5.31"
+    kotlin("jvm") version "1.9.20"
     `java-gradle-plugin`
     `kotlin-dsl`
 }
@@ -40,6 +40,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(gradleApi())
     testImplementation(gradleTestKit())
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.0")
 }
 
 tasks.test {

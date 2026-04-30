@@ -1,19 +1,33 @@
+package inspector
+
 import java.util.concurrent.ConcurrentHashMap
 import org.gradle.api.GradleException
-import org.gradle.api.artifacts.DependencyResolutionListener
 import org.gradle.api.artifacts.ResolvableDependencies
 import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import strategy.ConflictStrategy
+import strategy.MajorVersionConflictStrategy
 
-class DependencyInspector(private val extension: DependencyConflictAnalyzerExtension) :
-    DependencyResolutionListener {
+abstract class DependencyInspectorService :
+    BuildService<DependencyInspectorService.Params> {
+
+    interface Params : BuildServiceParameters {
+        val failOnConflict: Property<Boolean>
+        val excludeCheckingLibraries: ListProperty<String>
+        val excludeCheckingLibrariesGroup: ListProperty<String>
+    }
+
+    private val strategy: ConflictStrategy = MajorVersionConflictStrategy()
 
     private val edgeRequestedVersion =
         ConcurrentHashMap<Pair<ComponentIdentifier, ComponentIdentifier>, String>()
-
     private val globalParents =
         ConcurrentHashMap<ComponentIdentifier, MutableSet<ComponentIdentifier>>()
     private val globalRequested =
@@ -21,14 +35,11 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
     private val globalSelected = ConcurrentHashMap<ModuleKey, String>()
     private val pathCache = ConcurrentHashMap<ComponentIdentifier, List<DependencySource>>()
 
-    private val logger: Logger = LoggerFactory.getLogger(DependencyInspector::class.java)
-    override fun beforeResolve(dependencies: ResolvableDependencies) {
-        //don't need this method
-    }
+    private val logger: Logger = LoggerFactory.getLogger(DependencyInspectorService::class.java)
 
-    override fun afterResolve(dependencies: ResolvableDependencies) {
-        val excludeLibrariesGroupSet = extension.excludeCheckingLibrariesGroup.get().toSet()
-        val excludeLibrariesSet = extension.excludeCheckingLibraries.get().toSet()
+    fun afterResolve(dependencies: ResolvableDependencies) {
+        val excludeLibrariesGroupSet = parameters.excludeCheckingLibrariesGroup.get().toSet()
+        val excludeLibrariesSet = parameters.excludeCheckingLibraries.get().toSet()
         val rootId = dependencies.resolutionResult.root.id
 
         dependencies.resolutionResult.allDependencies.forEach { depResult ->
@@ -56,13 +67,9 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
                 excludeLibrariesGroupSet.contains(group) ||
                 excludeLibrariesSet.contains(stringKey)
             ) return@forEach
-            val isDirect = fromId == rootId
 
-            val requester = Requester(
-                id = fromId,
-                root = rootId,
-                isDirect = isDirect
-            )
+            val isDirect = fromId == rootId
+            val requester = Requester(id = fromId, root = rootId, isDirect = isDirect)
 
             globalRequested
                 .getOrPut(key) { ConcurrentHashMap() }
@@ -129,8 +136,7 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
         return result
     }
 
-    internal fun printConflicts() {
-
+    fun printConflicts() {
         val parents = globalParents.mapValues { it.value.toList() }
 
         globalRequested.forEach { (key, versionMap) ->
@@ -144,24 +150,24 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
             }.toMutableMap()
 
             val bucket = DependencyBucket(key.group, key.name, requested, globalSelected[key] ?: "")
-            val conflict = extension.strategy.analyzeConflict(bucket)
+            val conflict = strategy.analyzeConflict(bucket)
             if (conflict.danger) {
                 logger.warn(conflict.msg)
-                if (extension.failOnConflict.get()) {
-                    throw GradleException("${conflict.msg}\n you can ignore this issue with parameter failOnConflict")
+                if (parameters.failOnConflict.get()) {
+                    throw GradleException(
+                        "${conflict.msg}\n you can ignore this issue with parameter failOnConflict"
+                    )
                 }
             }
         }
     }
 
-    internal fun clearCache() {
-        pathCache.clear()
-    }
-
-    internal fun clear() {
+    fun clear() {
+        edgeRequestedVersion.clear()
         globalParents.clear()
         globalRequested.clear()
         globalSelected.clear()
+        pathCache.clear()
     }
 
     companion object {
@@ -175,16 +181,4 @@ class DependencyInspector(private val extension: DependencyConflictAnalyzerExten
             "org.jetbrains.kotlin:kotlin-stdlib-common"
         )
     }
-
 }
-
-data class Requester(
-    val id: ComponentIdentifier,
-    val root: ComponentIdentifier,
-    val isDirect: Boolean
-)
-
-data class ModuleKey(
-    val group: String,
-    val name: String
-)

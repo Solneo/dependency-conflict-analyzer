@@ -1,6 +1,6 @@
 package strategy
 
-import DependencyBucket
+import inspector.DependencyBucket
 import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.slf4j.Logger
