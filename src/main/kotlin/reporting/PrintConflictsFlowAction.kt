@@ -1,0 +1,20 @@
+package reporting
+
+import inspector.DependencyInspectorService
+import org.gradle.api.flow.FlowAction
+import org.gradle.api.flow.FlowParameters
+import org.gradle.api.provider.Property
+import org.gradle.api.services.ServiceReference
+
+abstract class PrintConflictsFlowAction : FlowAction<PrintConflictsFlowAction.Params> {
+    interface Params : FlowParameters {
+        @get:ServiceReference
+        val inspector: Property<DependencyInspectorService>
+    }
+
+    override fun execute(parameters: Params) {
+        val inspector = parameters.inspector.get()
+        inspector.printConflicts()
+        inspector.clear()
+    }
+}

@@ -1,6 +1,6 @@
 package strategy
 
-import DependencyBucket
+import inspector.DependencyBucket
 
 interface ConflictStrategy {
     fun analyzeConflict(depResult: DependencyBucket): AnalyzedConflict

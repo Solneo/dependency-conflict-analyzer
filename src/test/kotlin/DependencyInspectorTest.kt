@@ -1,3 +1,4 @@
+import inspector.DependencyInspectorService
 import org.gradle.api.internal.artifacts.DefaultModuleIdentifier
 import org.gradle.internal.component.external.model.DefaultModuleComponentIdentifier
 import org.gradle.testfixtures.ProjectBuilder
@@ -6,18 +7,22 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-class DependencyInspectorTest {
+class DependencyInspectorServiceTest {
 
-    private lateinit var inspector: DependencyInspector
+    private lateinit var inspector: DependencyInspectorService
 
     @BeforeEach
     fun setup() {
         val project = ProjectBuilder.builder().build()
-        val extension = project.extensions.create(
-            "dependencyConflictAnalyzer",
-            DependencyConflictAnalyzerExtension::class.java
-        )
-        inspector = DependencyInspector(extension)
+        val provider = project.gradle.sharedServices.registerIfAbsent(
+            "test-inspector",
+            DependencyInspectorService::class.java
+        ) {
+            parameters.failOnConflict.set(false)
+            parameters.excludeCheckingLibraries.set(emptyList())
+            parameters.excludeCheckingLibrariesGroup.set(emptyList())
+        }
+        inspector = provider.get()
     }
 
     private fun makeId(group: String, module: String, version: String): ComponentIdentifier =
@@ -54,7 +59,7 @@ class DependencyInspectorTest {
 
     @Test
     fun `findPathsToRoot respects MAX_DEPTH`() {
-        val ids = (0..DependencyInspector.MAX_DEPTH + 2).map { i ->
+        val ids = (0..DependencyInspectorService.MAX_DEPTH + 2).map { i ->
             makeId("org.test", "lib-$i", "1.0")
         }
         val parents = ids.zipWithNext()
@@ -70,12 +75,12 @@ class DependencyInspectorTest {
     fun `findPathsToRoot respects MAX_PATHS`() {
         val lib = makeId("org.slf4j", "slf4j-api", "2.0.9")
         val parents = mapOf<ComponentIdentifier, List<ComponentIdentifier>>(
-            lib to (0..DependencyInspector.MAX_PATHS + 5).map { i ->
+            lib to (0..DependencyInspectorService.MAX_PATHS + 5).map { i ->
                 makeId("project", "module-$i", "")
             }
         )
         val paths = inspector.findPathsToRoot(lib, parents)
-        assertTrue(paths.size <= DependencyInspector.MAX_PATHS)
+        assertTrue(paths.size <= DependencyInspectorService.MAX_PATHS)
     }
 
     @Test

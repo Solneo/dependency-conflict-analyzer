@@ -1,3 +1,5 @@
+package inspector
+
 import org.gradle.api.artifacts.component.ComponentIdentifier
 
 data class DependencyBucket(
