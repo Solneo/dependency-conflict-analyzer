@@ -1,28 +1,21 @@
-import inspector.DependencyInspectorService
+import analysis.ConflictAnalyzer
+import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.internal.artifacts.DefaultModuleIdentifier
 import org.gradle.internal.component.external.model.DefaultModuleComponentIdentifier
-import org.gradle.testfixtures.ProjectBuilder
-import org.gradle.api.artifacts.component.ComponentIdentifier
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import strategy.MajorVersionConflictStrategy
 
-class DependencyInspectorServiceTest {
+class ConflictAnalyzerTest {
 
-    private lateinit var inspector: DependencyInspectorService
+    private lateinit var analyzer: ConflictAnalyzer
 
     @BeforeEach
     fun setup() {
-        val project = ProjectBuilder.builder().build()
-        val provider = project.gradle.sharedServices.registerIfAbsent(
-            "test-inspector",
-            DependencyInspectorService::class.java
-        ) {
-            parameters.failOnConflict.set(false)
-            parameters.excludeCheckingLibraries.set(emptyList())
-            parameters.excludeCheckingLibrariesGroup.set(emptyList())
-        }
-        inspector = provider.get()
+        analyzer = ConflictAnalyzer(MajorVersionConflictStrategy())
     }
 
     private fun makeId(group: String, module: String, version: String): ComponentIdentifier =
@@ -35,8 +28,7 @@ class DependencyInspectorServiceTest {
         val root = makeId("project", "app", "")
         val lib = makeId("org.slf4j", "slf4j-api", "2.0.9")
 
-        val parents = mapOf(lib to listOf(root))
-        val paths = inspector.findPathsToRoot(lib, parents)
+        val paths = analyzer.findPathsToRoot(lib, mapOf(lib to listOf(root)), emptyMap())
 
         assertEquals(1, paths.size)
         assertEquals(listOf(root, lib), paths.first().path)
@@ -45,42 +37,36 @@ class DependencyInspectorServiceTest {
     @Test
     fun `findPathsToRoot returns multiple paths when lib has multiple parents`() {
         val root = makeId("project", "app", "")
-        val profile = makeId("project", "profile", "")
+        val middle = makeId("project", "profile", "")
         val lib = makeId("org.slf4j", "slf4j-api", "2.0.9")
 
-        val parents = mapOf(
-            lib to listOf(root, profile),
-            profile to listOf(root)
+        val paths = analyzer.findPathsToRoot(
+            lib,
+            mapOf(lib to listOf(root, middle), middle to listOf(root)),
+            emptyMap(),
         )
-        val paths = inspector.findPathsToRoot(lib, parents)
 
         assertEquals(2, paths.size)
     }
 
     @Test
     fun `findPathsToRoot respects MAX_DEPTH`() {
-        val ids = (0..DependencyInspectorService.MAX_DEPTH + 2).map { i ->
-            makeId("org.test", "lib-$i", "1.0")
-        }
-        val parents = ids.zipWithNext()
-            .associate { (child, parent) ->
-                child to listOf(parent)
-            }
+        val ids = (0..ConflictAnalyzer.MAX_DEPTH + 2).map { makeId("org.test", "lib-$it", "1.0") }
+        val parents = ids.zipWithNext().associate { (child, parent) -> child to listOf(parent) }
 
-        val paths = inspector.findPathsToRoot(ids.first(), parents)
+        val paths = analyzer.findPathsToRoot(ids.first(), parents, emptyMap())
+
         assertTrue(paths.isEmpty())
     }
 
     @Test
     fun `findPathsToRoot respects MAX_PATHS`() {
         val lib = makeId("org.slf4j", "slf4j-api", "2.0.9")
-        val parents = mapOf<ComponentIdentifier, List<ComponentIdentifier>>(
-            lib to (0..DependencyInspectorService.MAX_PATHS + 5).map { i ->
-                makeId("project", "module-$i", "")
-            }
-        )
-        val paths = inspector.findPathsToRoot(lib, parents)
-        assertTrue(paths.size <= DependencyInspectorService.MAX_PATHS)
+        val manyParents = (0..ConflictAnalyzer.MAX_PATHS + 5).map { makeId("project", "module-$it", "") }
+
+        val paths = analyzer.findPathsToRoot(lib, mapOf(lib to manyParents), emptyMap())
+
+        assertTrue(paths.size <= ConflictAnalyzer.MAX_PATHS)
     }
 
     @Test
@@ -88,28 +74,18 @@ class DependencyInspectorServiceTest {
         val a = makeId("org.test", "lib-a", "1.0")
         val b = makeId("org.test", "lib-b", "1.0")
 
-        val parents = mapOf(
-            a to listOf(b),
-            b to listOf(a)
-        )
         assertDoesNotThrow {
-            inspector.findPathsToRoot(a, parents)
+            analyzer.findPathsToRoot(a, mapOf(a to listOf(b), b to listOf(a)), emptyMap())
         }
     }
 
     @Test
-    fun `findPathsToRoot returns empty when no parents found`() {
+    fun `findPathsToRoot returns single-element path when lib has no parents`() {
         val lib = makeId("org.slf4j", "slf4j-api", "2.0.9")
-        val paths = inspector.findPathsToRoot(lib, emptyMap())
+
+        val paths = analyzer.findPathsToRoot(lib, emptyMap(), emptyMap())
+
         assertEquals(1, paths.size)
         assertEquals(listOf(lib), paths.first().path)
-    }
-
-    @Test
-    fun `clear resets all internal state`() {
-        inspector.clear()
-        assertDoesNotThrow {
-            inspector.printConflicts()
-        }
     }
 }

@@ -1,6 +1,6 @@
-package inspector
+package graph
 
-data class ModuleKey(
+internal data class ModuleKey(
     val group: String,
     val name: String
 )

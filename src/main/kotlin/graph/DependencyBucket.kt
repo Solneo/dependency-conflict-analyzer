@@ -1,19 +1,19 @@
-package inspector
+package graph
 
 import org.gradle.api.artifacts.component.ComponentIdentifier
 
-data class DependencyBucket(
+internal data class DependencyBucket(
     val group: String,
     val name: String,
     val requested: MutableMap<String, DependencyRequested>,
     var selected: String
 )
 
-data class DependencyRequested(
+internal data class DependencyRequested(
     val sources: MutableSet<DependencySource>
 )
 
-data class DependencySource(
+internal data class DependencySource(
     val path: List<ComponentIdentifier>,
     val requestedVersions: Map<ComponentIdentifier, String> = emptyMap()
 )

@@ -1,66 +1,51 @@
 package strategy
 
-import inspector.DependencyBucket
-import org.gradle.api.artifacts.component.ComponentIdentifier
+import analysis.Conflict
+import analysis.DependencyPath
+import analysis.PathNode
+import analysis.RequestedVersion
+import graph.DependencyBucket
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
-class MajorVersionConflictStrategy : ConflictStrategy {
+internal class MajorVersionConflictStrategy : ConflictStrategy {
 
-    private val logger: Logger = LoggerFactory.getLogger(MajorVersionConflictStrategy::class.java)
+    override fun findConflicts(buckets: List<DependencyBucket>): List<Conflict> =
+        buckets.mapNotNull { bucket -> toConflict(bucket) }
 
-    override fun analyzeConflict(bucket: DependencyBucket): AnalyzedConflict {
-            val uniqueVersions = bucket.requested.keys
-            .filter { it.isNotBlank() }
-            .toSet()
+    private fun toConflict(bucket: DependencyBucket): Conflict? {
+        val versions = bucket.requested.keys.filter { it.isNotBlank() }.toSet()
+        if (versions.size <= 1) return null
 
-        if (uniqueVersions.size <= 1) {
-            return AnalyzedConflict()
-        }
+        val majors = versions.mapNotNull { it.firstOrNull { c -> c.isDigit() } }.toSet()
+        if (majors.size <= 1) return null
 
-        val majors = bucket.requested.keys
-            .mapNotNull { ver -> ver.firstOrNull { it.isDigit() } }
-            .toSet()
-
-        if (majors.size <= 1) {
-            return AnalyzedConflict()
-        }
-
-        val msg = buildString {
-            append("Version conflict detected: ${bucket.group}:${bucket.name}\n")
-
-            bucket.requested.forEach { (version, dependencyRequested) ->
-                append("- version $version via:\n")
-                dependencyRequested.sources.forEach { source ->
-                    append("     - ")
-                    source.path.forEachIndexed { index, pathElement ->
-                        if (index == 0) {
-                            append("${pathElement.displayName} -> ")
-                        } else {
-                            val requested = source.requestedVersions[pathElement]
-                            if (requested != null) {
-                                append("${formatId(pathElement)}:$requested -> ")
-                            } else {
-                                append("${pathElement.displayName} -> ")
-                            }
-                        }
-                    }
-                    append("${bucket.group}:${bucket.name}:$version")
-                    append("\n")
-                }
-            }
-            append("→ using ${bucket.selected}\n")
-        }
-
-        return AnalyzedConflict(true, msg)
+        return Conflict(
+            group = bucket.group,
+            name = bucket.name,
+            selectedVersion = bucket.selected,
+            requestedVersions = bucket.requested.filter { (version, _) -> version.isNotBlank() }.map { (version, requested) ->
+                RequestedVersion(
+                    version = version,
+                    dependencyPaths = requested.sources.map { source ->
+                        DependencyPath(
+                            nodes = source.path.mapIndexed { index, id ->
+                                PathNode(
+                                    displayName = if (id is ModuleComponentIdentifier) {
+                                        "${id.group}:${id.module}"
+                                    } else {
+                                        id.displayName
+                                    },
+                                    requestedVersion = if (index > 0) {
+                                        source.requestedVersions[id]
+                                    } else {
+                                        null
+                                    },
+                                )
+                            },
+                        )
+                    },
+                )
+            },
+        )
     }
-
-    fun formatId(id: ComponentIdentifier): String {
-        return when (id) {
-            is ModuleComponentIdentifier -> "${id.group}:${id.module}"
-            else -> id.displayName
-        }
-    }
-
 }

@@ -1,10 +1,11 @@
-import inspector.DependencyInspectorService
+package gradle
+
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
 import org.gradle.util.GradleVersion
-import reporting.FlowActionReportTrigger
-import reporting.LegacyReportTrigger
+import reporting.trigger.FlowActionReportTrigger
+import reporting.trigger.LegacyReportTrigger
 
 class DependencyConflictAnalyzer : Plugin<Project> {
     override fun apply(project: Project) {
@@ -42,4 +43,3 @@ class DependencyConflictAnalyzer : Plugin<Project> {
         }
     }
 }
-
