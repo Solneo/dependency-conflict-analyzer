@@ -7,10 +7,12 @@ abstract class DependencyConflictAnalyzerExtension {
     abstract val failOnConflict: Property<Boolean>
     abstract val excludeCheckingLibraries: ListProperty<String>
     abstract val excludeCheckingLibrariesGroup: ListProperty<String>
+    abstract val printToConsole: Property<Boolean>
 
     init {
         failOnConflict.convention(false)
         excludeCheckingLibraries.convention(emptyList())
         excludeCheckingLibrariesGroup.convention(emptyList())
+        printToConsole.convention(true)
     }
 }

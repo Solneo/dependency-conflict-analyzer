@@ -7,7 +7,6 @@ import org.gradle.api.flow.FlowActionSpec
 import org.gradle.api.flow.FlowScope
 import org.gradle.api.internal.project.ProjectInternal
 import org.gradle.api.provider.Provider
-import reporting.PrintConflictsFlowAction
 
 internal object FlowActionReportTrigger {
     fun register(

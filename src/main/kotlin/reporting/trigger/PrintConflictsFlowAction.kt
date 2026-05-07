@@ -1,4 +1,4 @@
-package reporting
+package reporting.trigger
 
 import gradle.DependencyInspectorService
 import org.gradle.api.flow.FlowAction

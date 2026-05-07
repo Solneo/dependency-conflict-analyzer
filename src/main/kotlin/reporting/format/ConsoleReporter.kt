@@ -1,33 +1,38 @@
 package reporting.format
 
-import analysis.Conflict
 import analysis.ConflictReport
 import org.slf4j.Logger
 
 internal class ConsoleReporter(private val logger: Logger) : Reporter {
 
     override fun report(report: ConflictReport) {
-        report.conflicts.forEach { renderConflict(it) }
-    }
-
-    private fun renderConflict(conflict: Conflict) {
-        val text = buildString {
-            appendLine("Version conflict detected: ${conflict.group}:${conflict.name}")
-            conflict.requestedVersions.forEach { requested ->
-                appendLine("- version ${requested.version} via:")
-                requested.dependencyPaths.forEach { path ->
-                    append("     - ")
-                    path.nodes.forEachIndexed { index, node ->
-                        if (index > 0) append(" -> ")
-                        append(node.displayName)
-                        if (node.requestedVersion != null) append(":${node.requestedVersion}")
+        if (report.conflicts.isEmpty()) return
+        logger.warn("${report.conflicts.size} conflict(s) detected:")
+        report.conflicts.forEach { conflict ->
+            val text = buildString {
+                appendLine("Version conflict: ${conflict.group}:${conflict.name} (using ${conflict.selectedVersion})")
+                val sortedVersions = conflict.requestedVersions.sortedWith { a, b ->
+                    when {
+                        a.version == conflict.selectedVersion -> -1
+                        b.version == conflict.selectedVersion -> 1
+                        else -> b.version.compareTo(a.version)
                     }
-                    append(" -> ${conflict.group}:${conflict.name}:${requested.version}")
-                    appendLine()
+                }
+                sortedVersions.forEach { requested ->
+                    val inUse = if (requested.version == conflict.selectedVersion) " (in use)" else ""
+                    appendLine("- version ${requested.version}$inUse via:")
+                    requested.dependencyPaths.forEach { path ->
+                        append("     - ")
+                        path.nodes.forEachIndexed { index, node ->
+                            if (index > 0) append(" -> ")
+                            append(node.displayName)
+                            if (node.requestedVersion != null) append(":${node.requestedVersion}")
+                        }
+                        appendLine(" -> ${conflict.group}:${conflict.name}:${requested.version}")
+                    }
                 }
             }
-            append("→ using ${conflict.selectedVersion}\n")
+            logger.warn(text)
         }
-        logger.warn(text)
     }
 }
