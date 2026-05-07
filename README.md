@@ -150,7 +150,7 @@ The following are not included in conflict detection:
 <summary>Console report</summary>
 
 ```
-2 conflict(s) detected:
+1 conflict(s) detected:
 Version conflict: org.slf4j:slf4j-api (using 2.0.17)
 - version 2.0.17 (in use) via:
      - :app -> ch.qos.logback:logback-classic:1.4.11 -> org.slf4j:slf4j-api:2.0.17
