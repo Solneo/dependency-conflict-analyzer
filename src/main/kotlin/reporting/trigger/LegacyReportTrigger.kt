@@ -1,6 +1,6 @@
-package reporting
+package reporting.trigger
 
-import inspector.DependencyInspectorService
+import gradle.DependencyInspectorService
 import org.gradle.BuildAdapter
 import org.gradle.BuildResult
 import org.gradle.api.Project
@@ -14,7 +14,7 @@ internal object LegacyReportTrigger {
         project.gradle.addBuildListener(object : BuildAdapter() {
             override fun buildFinished(result: BuildResult) {
                 val inspector = inspectorProvider.get()
-                inspector.printConflicts()
+                inspector.runAndReport()
                 inspector.clear()
             }
         })

@@ -1,10 +1,12 @@
-import inspector.DependencyInspectorService
+package gradle
+
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
 import org.gradle.util.GradleVersion
-import reporting.FlowActionReportTrigger
-import reporting.LegacyReportTrigger
+import reporting.task.DependencyConflictReportTask
+import reporting.trigger.FlowActionReportTrigger
+import reporting.trigger.LegacyReportTrigger
 
 class DependencyConflictAnalyzer : Plugin<Project> {
     override fun apply(project: Project) {
@@ -18,6 +20,19 @@ class DependencyConflictAnalyzer : Plugin<Project> {
             parameters.failOnConflict.set(extension.failOnConflict)
             parameters.excludeCheckingLibraries.set(extension.excludeCheckingLibraries)
             parameters.excludeCheckingLibrariesGroup.set(extension.excludeCheckingLibrariesGroup)
+            parameters.printToConsole.set(extension.printToConsole)
+        }
+
+        project.tasks.register(
+            "generateDependencyConflictReport",
+            DependencyConflictReportTask::class.java,
+        ) {
+            inspector.set(inspectorProvider)
+            outputFile.convention(
+                extension.reportFile.orElse(
+                    project.rootProject.layout.buildDirectory.file("reports/dependency-conflict-analyzer/report.md")
+                )
+            )
         }
 
         project.rootProject.allprojects {
@@ -42,4 +57,3 @@ class DependencyConflictAnalyzer : Plugin<Project> {
         }
     }
 }
-

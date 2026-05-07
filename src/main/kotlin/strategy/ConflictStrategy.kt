@@ -1,7 +1,8 @@
 package strategy
 
-import inspector.DependencyBucket
+import analysis.Conflict
+import graph.DependencyBucket
 
-interface ConflictStrategy {
-    fun analyzeConflict(depResult: DependencyBucket): AnalyzedConflict
+internal interface ConflictStrategy {
+    fun findConflicts(buckets: List<DependencyBucket>): List<Conflict>
 }

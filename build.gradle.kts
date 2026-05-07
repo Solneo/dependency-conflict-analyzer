@@ -14,7 +14,7 @@ gradlePlugin {
             id = "io.github.solneo.dependency-conflict-analyzer"
             displayName = "Dependency Conflict Analyzer"
             description = "Help find conflict in gradle"
-            implementationClass = "DependencyConflictAnalyzer"
+            implementationClass = "gradle.DependencyConflictAnalyzer"
 
             tags.set(listOf("dependency", "conflict", "analyzer", "diagnostics"))
         }
