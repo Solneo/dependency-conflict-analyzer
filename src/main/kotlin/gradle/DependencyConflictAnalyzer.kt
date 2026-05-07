@@ -29,7 +29,9 @@ class DependencyConflictAnalyzer : Plugin<Project> {
         ) {
             inspector.set(inspectorProvider)
             outputFile.convention(
-                project.rootProject.layout.buildDirectory.file("reports/dependency-conflict-analyzer/report.md")
+                extension.reportFile.orElse(
+                    project.rootProject.layout.buildDirectory.file("reports/dependency-conflict-analyzer/report.md")
+                )
             )
         }
 

@@ -4,7 +4,7 @@
 [![GitHub](https://img.shields.io/github/license/solneo/dependency-conflict-analyzer)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/io.github.solneo.dependency-conflict-analyzer)](https://plugins.gradle.org/plugin/io.github.solneo.dependency-conflict-analyzer)
 
-A Gradle plugin that detects dependency version conflicts during sync and shows where each conflicting version came from.
+A Gradle plugin that detects dependency version conflicts and shows where each conflicting version came from.
 
 ## Why this plugin
 
@@ -20,7 +20,7 @@ On every Gradle sync, the plugin traverses the resolved dependency graph and ide
 - The full dependency path for each version — through which modules and libraries it was pulled in
 - Which version Gradle ended up selecting
 
-By default, the plugin only prints the report. You can also configure it to fail the build when conflicts are detected.
+By default, the plugin prints the report to the console. You can also generate a standalone Markdown report or configure the build to fail when conflicts are detected.
 
 ## Scope: major versions only
 
@@ -31,7 +31,7 @@ This is by design. Under semantic versioning, major version bumps are where brea
 ## Compatibility
 
 - Gradle **8.3+** (tested with 8.3, 8.5, and 9.5)
-- Configuration cache: **supported**
+- Configuration cache: **supported** (console report only; see [Markdown report](#markdown-report) for caveats)
 - Works with Java, Kotlin, and Android projects
 
 ## Usage
@@ -50,7 +50,7 @@ plugins {
 
 On your `build.gradle.kts` add:
 
-```kotlin 
+```kotlin
 plugins {
     id("io.github.solneo.dependency-conflict-analyzer") version "1.4.0"
 }
@@ -58,43 +58,58 @@ plugins {
 
 ## Configuration
 
-You can enable build failure on detected conflicts using the `failOnConflict` option:
-
-### Groovy
-
-```groovy
-dependencyConflictAnalyzer {
-   failOnConflict = false
-}
-```
+All configuration is optional — the plugin works out of the box with no setup required.
 
 ### Kotlin DSL
 
 ```kotlin
 dependencyConflictAnalyzer {
-   failOnConflict.set(false)
+    failOnConflict.set(true)                                            // optional, default: false
+    printToConsole.set(false)                                           // optional, default: true
+    reportFile.set(layout.buildDirectory.file("reports/conflicts.md"))  // optional, type: RegularFile
+    excludeCheckingLibrariesGroup.set(listOf("com.example.group"))      // optional
+    excludeCheckingLibraries.set(listOf("com.example.group:artifact"))  // optional
 }
 ```
-
-You can also exclude specific groups or artifacts from analysis:
 
 ### Groovy
 
 ```groovy
 dependencyConflictAnalyzer {
-   excludeCheckingLibrariesGroup = ["com.example.code.group"]
-   excludeCheckingLibraries = ["com.example.code.group:artifact"]
+    failOnConflict = true                                               // optional, default: false
+    printToConsole = false                                              // optional, default: true
+    reportFile = layout.buildDirectory.file("reports/conflicts.md")     // optional, type: RegularFile
+    excludeCheckingLibrariesGroup = ["com.example.group"]               // optional
+    excludeCheckingLibraries = ["com.example.group:artifact"]           // optional
 }
 ```
 
-### Kotlin DSL
+<details>
+<summary>All options</summary>
 
-```kotlin
-dependencyConflictAnalyzer {
-   excludeCheckingLibrariesGroup.set(listOf("com.example.code.group"))
-   excludeCheckingLibraries.set(listOf("com.example.code.group:artifact"))
-}
+All options are optional.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `failOnConflict` | `Boolean` | `false` | Fail the build when conflicts are detected |
+| `printToConsole` | `Boolean` | `true` | Print the conflict report to the console |
+| `reportFile` | `RegularFile` | `build/reports/dependency-conflict-analyzer/report.md` | Output path for the Markdown report |
+| `excludeCheckingLibraries` | `List<String>` | `[]` | Artifacts to exclude (`"group:name"`) |
+| `excludeCheckingLibrariesGroup` | `List<String>` | `[]` | Groups to exclude entirely |
+
+</details>
+
+## Markdown report
+
+To generate a standalone Markdown report, run:
+
 ```
+./gradlew generateDependencyConflictReport
+```
+
+The report is saved to `build/reports/dependency-conflict-analyzer/report.md` by default. Use `reportFile` in the extension to change the path.
+
+> **Note:** `generateDependencyConflictReport` is not compatible with the configuration cache. This is consistent with Gradle's own dependency analysis tasks such as `dependencyInsight`.
 
 ## Known Limitations
 
@@ -123,22 +138,46 @@ The following are not included in conflict detection:
 
 ## Example output
 
-The plugin outputs a report to the console:
-
 <details>
-<summary>Text Report</summary>
+<summary>Console report</summary>
 
 ```
-Version conflict detected: org.slf4j:slf4j-api
-- version 2.0.17 via:
-     - project :app -> ch.qos.logback:logback-classic:1.4.11 -> org.slf4j:slf4j-api:2.0.17
-     - project :app -> project :profile -> project :favorites -> ch.qos.logback:logback-classic:1.5.32 -> org.slf4j:slf4j-api:2.0.17
-     - project :app -> project :feed -> project :favorites -> ch.qos.logback:logback-classic:1.5.32 -> org.slf4j:slf4j-api:2.0.17
+2 conflict(s) detected:
+Version conflict: org.slf4j:slf4j-api (using 2.0.17)
+- version 2.0.17 (in use) via:
+     - :app -> ch.qos.logback:logback-classic:1.4.11 -> org.slf4j:slf4j-api:2.0.17
+     - :app -> project :profile -> ch.qos.logback:logback-classic:1.5.32 -> org.slf4j:slf4j-api:2.0.17
 - version 1.7.25 via:
-     - project :app -> org.apache.logging.log4j:log4j-slf4j-impl:2.17.1 -> org.slf4j:slf4j-api:1.7.25
-- version 2.0.9 via:
-     - project :app -> org.slf4j:slf4j-api:2.0.9
-→ using 2.0.17
+     - :app -> org.apache.logging.log4j:log4j-slf4j-impl:2.17.1 -> org.slf4j:slf4j-api:1.7.25
+```
+Note: dependencies are used only as an example
+</details>
+
+<details>
+<summary>Markdown report</summary>
+
+```markdown
+# Dependency Conflict Report
+
+**1 conflict(s) detected:**
+
+- [org.slf4j:slf4j-api](#slf4j-api) — using 2.0.17
+
+---
+
+<a id="slf4j-api"></a>
+## `org.slf4j:slf4j-api` (using 2.0.17)
+
+### Version 2.0.17 • in use
+
+- :app -> ch.qos.logback:logback-classic:1.4.11 -> org.slf4j:slf4j-api:2.0.17
+- :app -> project :profile -> ch.qos.logback:logback-classic:1.5.32 -> org.slf4j:slf4j-api:2.0.17
+
+### Version 1.7.25
+
+- :app -> org.apache.logging.log4j:log4j-slf4j-impl:2.17.1 -> org.slf4j:slf4j-api:1.7.25
+
+---
 ```
 Note: dependencies are used only as an example
 </details>
