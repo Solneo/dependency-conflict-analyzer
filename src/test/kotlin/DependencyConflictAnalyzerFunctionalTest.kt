@@ -58,7 +58,7 @@ class DependencyConflictAnalyzerFunctionalTest {
         println("=== END ===")
 
         assertTrue(
-            result.output.contains("Version conflict detected: com.google.code.gson:gson"),
+            result.output.contains("Version conflict: com.google.code.gson:gson"),
             "Expected conflict warning in output, got:\n${result.output}"
         )
     }

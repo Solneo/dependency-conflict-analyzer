@@ -14,13 +14,17 @@ This plugin takes a different angle. It analyzes the resolved dependency graph o
 
 ## What it does
 
-On every Gradle sync, the plugin traverses the resolved dependency graph and identifies artifacts that appear in more than one version. For each conflict it reports:
+The plugin traverses the resolved dependency graph and identifies artifacts that appear in more than one version. For each conflict it reports:
 
 - All versions present in the graph
 - The full dependency path for each version — through which modules and libraries it was pulled in
 - Which version Gradle ended up selecting
 
-By default, the plugin prints the report to the console. You can also generate a standalone Markdown report or configure the build to fail when conflicts are detected.
+Two report formats are available:
+- **Console** — printed automatically on every sync
+- **Markdown** — generated on demand via [`generateDependencyConflictReport`](#markdown-report)
+
+You can also configure the build to fail when conflicts are detected.
 
 ## Scope: major versions only
 
@@ -42,7 +46,7 @@ On your `build.gradle` add:
 
 ```groovy
 plugins {
-  id "io.github.solneo.dependency-conflict-analyzer" version "1.4.0"
+  id "io.github.solneo.dependency-conflict-analyzer" version "1.5.0"
 }
 ```
 
@@ -52,9 +56,21 @@ On your `build.gradle.kts` add:
 
 ```kotlin
 plugins {
-    id("io.github.solneo.dependency-conflict-analyzer") version "1.4.0"
+    id("io.github.solneo.dependency-conflict-analyzer") version "1.5.0"
 }
 ```
+
+## Markdown report
+
+To generate a standalone Markdown report, run:
+
+```
+./gradlew generateDependencyConflictReport
+```
+
+The report is saved to `build/reports/dependency-conflict-analyzer/report.md` by default. Use `reportFile` in the extension to change the path.
+
+> **Note:** `generateDependencyConflictReport` is not compatible with the configuration cache. This is consistent with Gradle's own dependency analysis tasks such as `dependencyInsight`.
 
 ## Configuration
 
@@ -87,7 +103,7 @@ dependencyConflictAnalyzer {
 <details>
 <summary>All options</summary>
 
-All options are optional.
+Everything below is optional.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
@@ -99,17 +115,9 @@ All options are optional.
 
 </details>
 
-## Markdown report
+## CI integration
 
-To generate a standalone Markdown report, run:
-
-```
-./gradlew generateDependencyConflictReport
-```
-
-The report is saved to `build/reports/dependency-conflict-analyzer/report.md` by default. Use `reportFile` in the extension to change the path.
-
-> **Note:** `generateDependencyConflictReport` is not compatible with the configuration cache. This is consistent with Gradle's own dependency analysis tasks such as `dependencyInsight`.
+The Markdown report can be surfaced in pull requests via [GitHub Actions job summary](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#adding-a-job-summary) or posted as a PR comment using the [GitHub CLI](https://cli.github.com/manual/gh_pr_comment).
 
 ## Known Limitations
 
